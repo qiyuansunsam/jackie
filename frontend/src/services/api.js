@@ -1,7 +1,19 @@
 import axios from 'axios';
 
-// Use environment variable or default to production URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://jackie-portfolio-api.onrender.com/api';
+// Use environment variable or default to local development
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+// Get host secret from localStorage or prompt
+const getHostSecret = () => {
+  let secret = localStorage.getItem('hostSecret');
+  if (!secret && localStorage.getItem('isHost') === 'true') {
+    secret = prompt('Enter host secret key:');
+    if (secret) {
+      localStorage.setItem('hostSecret', secret);
+    }
+  }
+  return secret;
+};
 
 const api = {
   // Messages endpoints
@@ -27,13 +39,23 @@ const api = {
 
   deleteMessage: async (messageId) => {
     try {
+      const hostSecret = getHostSecret();
+      if (!hostSecret) {
+        throw new Error('Host authentication required');
+      }
+      
       const response = await axios.delete(`${API_BASE_URL}/messages/${messageId}`, {
         headers: {
-          'Authorization': 'Bearer host-secret-key' // In production, use proper authentication
+          'Authorization': `Bearer ${hostSecret}`
         }
       });
       return response.data;
     } catch (error) {
+      if (error.response && error.response.status === 401) {
+        // Clear invalid secret
+        localStorage.removeItem('hostSecret');
+        alert('Invalid host secret. Please try again.');
+      }
       console.error('Error deleting message:', error);
       throw error;
     }

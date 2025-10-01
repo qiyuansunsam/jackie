@@ -1,8 +1,11 @@
 #!/bin/bash
 
-# Backend run script for local development
+# Backend start script for local development
 
 echo "Starting Jackie Portfolio Backend..."
+
+# Kill any process using port 5000
+lsof -ti:5000 | xargs kill -9 2>/dev/null || true
 
 # Create virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then

@@ -15,7 +15,14 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
 db = SQLAlchemy(app)
-CORS(app)
+
+# CORS configuration - Update with your actual frontend URL
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+CORS(app, origins=[
+    "http://localhost:3000",
+    "https://jackie-portfolio.onrender.com",  # Your frontend URL
+    FRONTEND_URL
+])
 
 # Models
 class Message(db.Model):
@@ -83,9 +90,10 @@ def create_message():
 def delete_message(message_id):
     try:
         # Only allow host to delete messages
-        # In production, you'd want proper authentication
         auth_header = request.headers.get('Authorization')
-        if auth_header != 'Bearer host-secret-key':
+        host_key = os.environ.get('HOST_SECRET_KEY', 'host-secret-key')
+        
+        if auth_header != f'Bearer {host_key}':
             return jsonify({'error': 'Unauthorized'}), 401
         
         message = Message.query.get(message_id)
