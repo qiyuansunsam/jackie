@@ -6,30 +6,25 @@ import os
 
 app = Flask(__name__)
 
-# Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///messages.db')
-if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
-    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
-
+# Use SQLite for now - we'll add PostgreSQL later
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///messages.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
+# Initialize database
 db = SQLAlchemy(app)
 
-# CORS configuration - Update with your actual frontend URL
-FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
-CORS(app, origins=[
-    "http://localhost:3000",
-    "https://jackie-portfolio.onrender.com",  # Your frontend URL
-    FRONTEND_URL
-])
+# CORS configuration - allow all origins during setup
+CORS(app, origins="*")
 
 # Models
 class Message(db.Model):
+    __tablename__ = 'messages'
+    
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.Text, nullable=False)
-    sender_type = db.Column(db.String(20), nullable=False)  # 'visitor' or 'host'
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    sender_type = db.Column(db.String(20), nullable=False, default='visitor')
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     sender_name = db.Column(db.String(100), default='Anonymous')
 
     def to_dict(self):
@@ -37,18 +32,30 @@ class Message(db.Model):
             'id': self.id,
             'content': self.content,
             'sender_type': self.sender_type,
-            'timestamp': self.timestamp.isoformat(),
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
             'sender_name': self.sender_name
         }
 
 # Create tables
 with app.app_context():
     db.create_all()
+    print("Database tables created successfully!")
 
 # Routes
+@app.route('/')
+def index():
+    return jsonify({
+        'message': 'Jackie Portfolio API',
+        'status': 'running',
+        'version': '1.0'
+    }), 200
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    return jsonify({'status': 'healthy', 'message': 'API is running'}), 200
+    return jsonify({
+        'status': 'healthy',
+        'message': 'API is running'
+    }), 200
 
 @app.route('/api/messages', methods=['GET'])
 def get_messages():
@@ -56,7 +63,7 @@ def get_messages():
         messages = Message.query.order_by(Message.timestamp.desc()).limit(50).all()
         return jsonify([msg.to_dict() for msg in messages]), 200
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Failed to fetch messages', 'details': str(e)}), 500
 
 @app.route('/api/messages', methods=['POST'])
 def create_message():
@@ -66,16 +73,20 @@ def create_message():
         if not data or 'content' not in data:
             return jsonify({'error': 'Content is required'}), 400
         
-        # Validate sender_type
+        content = str(data.get('content', '')).strip()[:500]
+        if not content:
+            return jsonify({'error': 'Content cannot be empty'}), 400
+        
         sender_type = data.get('sender_type', 'visitor')
         if sender_type not in ['visitor', 'host']:
             sender_type = 'visitor'
         
-        # Create new message
+        sender_name = str(data.get('sender_name', 'Anonymous')).strip()[:50] or 'Anonymous'
+        
         new_message = Message(
-            content=data['content'][:500],  # Limit message length
+            content=content,
             sender_type=sender_type,
-            sender_name=data.get('sender_name', 'Anonymous')[:50]
+            sender_name=sender_name
         )
         
         db.session.add(new_message)
@@ -84,12 +95,11 @@ def create_message():
         return jsonify(new_message.to_dict()), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Failed to create message', 'details': str(e)}), 500
 
 @app.route('/api/messages/<int:message_id>', methods=['DELETE'])
 def delete_message(message_id):
     try:
-        # Only allow host to delete messages
         auth_header = request.headers.get('Authorization')
         host_key = os.environ.get('HOST_SECRET_KEY', 'host-secret-key')
         
@@ -106,9 +116,8 @@ def delete_message(message_id):
         return jsonify({'message': 'Deleted successfully'}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Failed to delete message', 'details': str(e)}), 500
 
-# Portfolio data endpoint
 @app.route('/api/portfolio', methods=['GET'])
 def get_portfolio_data():
     portfolio = {
