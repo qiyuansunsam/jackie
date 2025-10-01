@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Frontend build script for local development
+# Frontend build script for production
 
-echo "Starting Jackie Portfolio Frontend..."
+echo "Building Jackie Portfolio Frontend..."
 
 # Check if node_modules exists, if not install dependencies
 if [ ! -d "node_modules" ]; then
@@ -10,9 +10,8 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
-# Set development environment variables
-export REACT_APP_API_URL=http://localhost:5000/api
+# Build the production bundle
+echo "Creating production build..."
+npm run build
 
-# Start the development server
-echo "Starting React development server on http://localhost:3000"
-npm start
+echo "Build complete! Static files are in ./build directory"

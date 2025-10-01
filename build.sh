@@ -50,8 +50,8 @@ fi
 echo ""
 echo "Starting Frontend Server..."
 cd frontend
-chmod +x build.sh
-./build.sh &
+chmod +x start.sh
+./start.sh &
 FRONTEND_PID=$!
 cd ..
 
