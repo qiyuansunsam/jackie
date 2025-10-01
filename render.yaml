@@ -1,0 +1,37 @@
+services:
+  # Backend API Service
+  - type: web
+    name: jackie-portfolio-api
+    env: python
+    buildCommand: "pip install -r backend/requirements.txt"
+    startCommand: "cd backend && gunicorn app:app --bind 0.0.0.0:$PORT"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: jackie-portfolio-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHONUNBUFFERED
+        value: 1
+
+  # Frontend Static Site
+  - type: static
+    name: jackie-portfolio-frontend
+    buildCommand: "cd frontend && npm install && npm run build"
+    staticPublishPath: ./frontend/build
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://jackie-portfolio-api.onrender.com/api
+
+databases:
+  - name: jackie-portfolio-db
+    databaseName: jackie_portfolio
+    plan: free
+    user: jackie_admin
